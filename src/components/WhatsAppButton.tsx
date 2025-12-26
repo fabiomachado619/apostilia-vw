@@ -63,7 +63,7 @@ export default function WhatsAppButton() {
 
     try {
       // Enviar dados para o webhook
-      const response = await fetch('https://mobile.advogar.site/api/crm/webhook/7312/286252177c2aac7cc5bbb973ac939862d1787b2b51af6e562b8fdeab2ac402f6', {
+      const response = await fetch('https://fluxzap-n8n.eukq0m.easypanel.host/webhook/botao_whats_pgn_vw', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
