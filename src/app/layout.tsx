@@ -2,6 +2,7 @@ import { Metadata } from 'next'
 import './globals.css'
 import Head from '@/components/Head'
 import FacebookPixel from '@/components/FacebookPixel'
+import FacebookPixelTracking from '@/components/FacebookPixelTracking'
 
 export const metadata: Metadata = {
   title: 'Apostila Técnica para Reparo de Módulos Volkswagen – Bosch, Marelli, Siemens',
@@ -92,6 +93,7 @@ export default function RootLayout({
       </head>
       <body>
         <FacebookPixel />
+        <FacebookPixelTracking />
         {children}
       </body>
     </html>
