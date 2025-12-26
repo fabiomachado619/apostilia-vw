@@ -74,6 +74,11 @@ export default function Home() {
                       src="/apostila-tablet.jpg" 
                       alt="Apostila em tablet" 
                       className="w-full h-32 sm:h-40 lg:h-48 object-cover rounded"
+                      loading="lazy"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.style.display = 'none'
+                      }}
                     />
                     <p className="text-center text-xs sm:text-sm mt-2 text-gray-300">Tablet</p>
                   </div>
@@ -82,6 +87,11 @@ export default function Home() {
                       src="/apostila-mobile.jpg" 
                       alt="Apostila em celular" 
                       className="w-full h-32 sm:h-40 lg:h-48 object-cover rounded"
+                      loading="lazy"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.style.display = 'none'
+                      }}
                     />
                     <p className="text-center text-xs sm:text-sm mt-2 text-gray-300">Celular</p>
                   </div>
@@ -90,6 +100,11 @@ export default function Home() {
                       src="/apostila-laptop.jpg" 
                       alt="Apostila em notebook" 
                       className="w-full h-24 sm:h-32 lg:h-40 object-cover rounded"
+                      loading="lazy"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.style.display = 'none'
+                      }}
                     />
                     <p className="text-center text-xs sm:text-sm mt-2 text-gray-300">Notebook</p>
                   </div>
@@ -493,6 +508,11 @@ export default function Home() {
                         src="/apostila-preview-1.jpg" 
                         alt="Página da apostila mostrando placa de circuito ECU" 
                         className="w-full rounded-lg shadow-md"
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                        }}
                       />
                       <div className="mt-4 bg-blue-50 p-3 sm:p-4 rounded-lg">
                         <p className="text-sm font-semibold text-blue-900 mb-2">📍 Pontos Críticos:</p>
@@ -519,6 +539,11 @@ export default function Home() {
                           src="/apostila-mobile.jpg" 
                           alt="Visualização da apostila em celular" 
                           className="w-full rounded"
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                          }}
                         />
                       </div>
                       <div className="mt-4 text-center text-gray-600">

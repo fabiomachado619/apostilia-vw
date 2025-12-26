@@ -1,195 +1,257 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 
 declare global {
   interface Window {
-    fbq: (...args: any[]) => void
-    _fbq: any[]
+    fbq?: (...args: any[]) => void
+    _fbq?: any[]
   }
 }
 
 export default function FacebookPixelTracking() {
-  const [hasTrackedViewContent, setHasTrackedViewContent] = useState(false)
-  const [scrollDepths, setScrollDepths] = useState({
+  const hasTrackedViewContent = useRef(false)
+  const scrollDepths = useRef({
     scroll25: false,
     scroll50: false,
     scroll75: false,
     scroll100: false
   })
-
-  const scrollObserverRef = useRef<IntersectionObserver | null>(null)
+  const scrollHandlerRef = useRef<(() => void) | null>(null)
+  const isMounted = useRef(true)
+  const trackViewContentRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     // Verificar se estamos no navegador
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return
+    }
+
+    // Função segura para verificar se Pixel está pronto
+    const isPixelReady = (): boolean => {
+      try {
+        return !!(window.fbq && typeof window.fbq === 'function')
+      } catch {
+        return false
+      }
+    }
 
     // Função auxiliar para rastreamento com verificações de segurança
     const trackEvent = (eventName: string, params?: Record<string, any>) => {
+      if (!isMounted.current) return
+      
       try {
-        if (window.fbq && typeof window.fbq === 'function') {
-          const eventParams = {
-            content_name: 'Apostila Técnica VW',
-            timestamp: new Date().toISOString(),
-            ...params
-          }
+        if (!isPixelReady()) return
 
-          if (eventName.startsWith('Scroll')) {
-            window.fbq('trackCustom', eventName, eventParams)
-          } else if (eventName === 'ViewContent' || eventName === 'Lead') {
-            window.fbq('track', eventName, eventParams)
-          } else {
-            window.fbq('trackCustom', eventName, eventParams)
-          }
+        const eventParams = {
+          content_name: 'Apostila Técnica VW',
+          timestamp: new Date().toISOString(),
+          ...params
+        }
 
-          console.log('Facebook Pixel Event:', eventName, eventParams)
+        if (eventName.startsWith('Scroll')) {
+          window.fbq!('trackCustom', eventName, eventParams)
+        } else if (eventName === 'ViewContent' || eventName === 'Lead') {
+          window.fbq!('track', eventName, eventParams)
+        } else {
+          window.fbq!('trackCustom', eventName, eventParams)
         }
       } catch (error) {
-        console.warn('Facebook Pixel tracking error:', error)
+        // Silenciar todos os erros para não quebrar a página
       }
     }
 
     // 1. ViewContent - quando a página carregar completamente
     const trackViewContent = () => {
-      if (!hasTrackedViewContent && document.readyState === 'complete') {
-        trackEvent('ViewContent', {
-          content_type: 'landing_page',
-          content_category: 'apostila_tecnica'
-        })
-        setHasTrackedViewContent(true)
+      if (!hasTrackedViewContent.current && document.readyState === 'complete') {
+        // Aguardar Pixel estar pronto (máximo 5 segundos)
+        let attempts = 0
+        const checkAndTrack = () => {
+          if (!isMounted.current) return
+          
+          if (isPixelReady()) {
+            trackEvent('ViewContent', {
+              content_type: 'landing_page',
+              content_category: 'apostila_tecnica'
+            })
+            hasTrackedViewContent.current = true
+          } else if (attempts < 50 && isMounted.current) {
+            attempts++
+            setTimeout(checkAndTrack, 100)
+          }
+        }
+        checkAndTrack()
       }
     }
 
+    trackViewContentRef.current = trackViewContent
+
     if (document.readyState === 'complete') {
-      trackViewContent()
+      setTimeout(trackViewContent, 500)
     } else {
-      window.addEventListener('load', trackViewContent)
+      window.addEventListener('load', trackViewContent, { once: true })
     }
 
-    // 2. Scroll Tracking - versão simplificada
+    // 2. Scroll Tracking - versão ultra segura
     const setupScrollTracking = () => {
-      let lastScrollPercent = 0
+      if (!isMounted.current) return
 
       const handleScroll = () => {
+        if (!isMounted.current) return
+
         try {
-          const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-          const windowHeight = window.innerHeight
+          const scrollTop = Math.max(
+            window.pageYOffset || 0,
+            document.documentElement?.scrollTop || 0,
+            0
+          )
+          const windowHeight = window.innerHeight || 1
+          const body = document.body
+          const html = document.documentElement
+
           const documentHeight = Math.max(
-            document.body.scrollHeight,
-            document.body.offsetHeight,
-            document.documentElement.clientHeight,
-            document.documentElement.scrollHeight,
-            document.documentElement.offsetHeight
+            body?.scrollHeight || 0,
+            body?.offsetHeight || 0,
+            html?.clientHeight || 0,
+            html?.scrollHeight || 0,
+            html?.offsetHeight || 0,
+            windowHeight
           )
 
-          const scrollPercent = Math.round((scrollTop / (documentHeight - windowHeight)) * 100)
+          const maxScroll = Math.max(documentHeight - windowHeight, 1)
+          if (maxScroll <= 0) return
 
-          // Evitar múltiplos disparos do mesmo percentual
-          if (scrollPercent === lastScrollPercent) return
-          lastScrollPercent = scrollPercent
+          const scrollPercent = Math.min(Math.max(Math.round((scrollTop / maxScroll) * 100), 0), 100)
 
-          // Disparar eventos nos marcos definidos
-          if (scrollPercent >= 25 && !scrollDepths.scroll25) {
+          // Disparar eventos apenas uma vez cada
+          if (scrollPercent >= 25 && !scrollDepths.current.scroll25 && isPixelReady()) {
             trackEvent('Scroll25', { scroll_depth: '25%' })
-            setScrollDepths(prev => ({ ...prev, scroll25: true }))
+            scrollDepths.current.scroll25 = true
           }
-          if (scrollPercent >= 50 && !scrollDepths.scroll50) {
+          if (scrollPercent >= 50 && !scrollDepths.current.scroll50 && isPixelReady()) {
             trackEvent('Scroll50', { scroll_depth: '50%' })
-            setScrollDepths(prev => ({ ...prev, scroll50: true }))
+            scrollDepths.current.scroll50 = true
           }
-          if (scrollPercent >= 75 && !scrollDepths.scroll75) {
+          if (scrollPercent >= 75 && !scrollDepths.current.scroll75 && isPixelReady()) {
             trackEvent('Scroll75', { scroll_depth: '75%' })
-            setScrollDepths(prev => ({ ...prev, scroll75: true }))
+            scrollDepths.current.scroll75 = true
           }
-          if (scrollPercent >= 100 && !scrollDepths.scroll100) {
+          if (scrollPercent >= 100 && !scrollDepths.current.scroll100 && isPixelReady()) {
             trackEvent('Scroll100', { scroll_depth: '100%' })
-            setScrollDepths(prev => ({ ...prev, scroll100: true }))
+            scrollDepths.current.scroll100 = true
           }
         } catch (error) {
-          console.warn('Scroll tracking error:', error)
+          // Silenciar erros
         }
       }
 
       // Throttle para performance
       let ticking = false
       const throttledScroll = () => {
-        if (!ticking) {
+        if (!ticking && isMounted.current) {
           requestAnimationFrame(() => {
-            handleScroll()
+            if (isMounted.current) {
+              handleScroll()
+            }
             ticking = false
           })
           ticking = true
         }
       }
 
-      window.addEventListener('scroll', throttledScroll, { passive: true })
+      // Aguardar um pouco antes de adicionar listener
+      setTimeout(() => {
+        if (isMounted.current) {
+          window.addEventListener('scroll', throttledScroll, { passive: true })
+          scrollHandlerRef.current = throttledScroll
+        }
+      }, 1000)
     }
 
-    // Inicializar scroll tracking
-    setupScrollTracking()
+    // Aguardar DOM estar pronto
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', setupScrollTracking, { once: true })
+    } else {
+      setTimeout(setupScrollTracking, 500)
+    }
 
-    // 3. WhatsApp Button Tracking - simplificado
+    // 3. WhatsApp Button Tracking
     const setupWhatsAppTracking = () => {
-      // Usar timeout para garantir que os elementos estão carregados
       setTimeout(() => {
+        if (!isMounted.current) return
+
         try {
-          // Click no botão flutuante
           const floatingButton = document.querySelector('button[aria-label="Contato via WhatsApp"]')
-          if (floatingButton) {
-            floatingButton.addEventListener('click', () => {
-              trackEvent('ClickWhatsApp', {
-                button_type: 'floating',
-                content_category: 'contact'
-              })
-            })
+          if (floatingButton && isMounted.current) {
+            const handleClick = () => {
+              if (isPixelReady()) {
+                trackEvent('ClickWhatsApp', {
+                  button_type: 'floating',
+                  content_category: 'contact'
+                })
+              }
+            }
+            floatingButton.addEventListener('click', handleClick)
           }
 
-          // Click no botão do formulário
           const formButton = document.querySelector('button[type="submit"]')
-          if (formButton) {
-            formButton.addEventListener('click', () => {
-              trackEvent('ClickWhatsApp', {
-                button_type: 'form_submit',
-                content_category: 'lead_generation'
-              })
-            })
+          if (formButton && isMounted.current) {
+            const handleSubmit = () => {
+              if (isPixelReady()) {
+                trackEvent('ClickWhatsApp', {
+                  button_type: 'form_submit',
+                  content_category: 'lead_generation'
+                })
+              }
+            }
+            formButton.addEventListener('click', handleSubmit)
           }
         } catch (error) {
-          console.warn('WhatsApp tracking setup error:', error)
+          // Silenciar erros
         }
-      }, 2000)
+      }, 4000)
     }
 
-    // 4. Form Tracking - simplificado
+    // 4. Form Tracking
     const setupFormTracking = () => {
       setTimeout(() => {
+        if (!isMounted.current) return
+
         try {
-          // Lead completion (quando o formulário é enviado)
           const form = document.querySelector('form')
-          if (form) {
-            form.addEventListener('submit', () => {
-              trackEvent('Lead', {
-                content_category: 'whatsapp_lead',
-                value: 0,
-                currency: 'BRL'
-              })
-            })
+          if (form && isMounted.current) {
+            const handleSubmit = () => {
+              if (isPixelReady()) {
+                trackEvent('Lead', {
+                  content_category: 'whatsapp_lead',
+                  value: 0,
+                  currency: 'BRL'
+                })
+              }
+            }
+            form.addEventListener('submit', handleSubmit)
           }
         } catch (error) {
-          console.warn('Form tracking setup error:', error)
+          // Silenciar erros
         }
-      }, 2000)
+      }, 4000)
     }
 
-    // Inicializar rastreamentos básicos
+    // Inicializar rastreamentos
     setupWhatsAppTracking()
     setupFormTracking()
 
-    // Cleanup básico
+    // Cleanup completo
     return () => {
-      window.removeEventListener('load', trackViewContent)
+      isMounted.current = false
+      if (trackViewContentRef.current) {
+        window.removeEventListener('load', trackViewContentRef.current)
+      }
+      if (scrollHandlerRef.current) {
+        window.removeEventListener('scroll', scrollHandlerRef.current)
+      }
     }
-  }, [hasTrackedViewContent, scrollDepths, videoTracking])
+  }, []) // Dependências vazias - executa apenas uma vez na montagem
 
   return null
 }
